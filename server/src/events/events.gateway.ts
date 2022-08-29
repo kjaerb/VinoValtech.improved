@@ -52,8 +52,8 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       );
       this.roomService.deleteMany(rooms.map((room) => room.id));
       rooms.forEach((room) => {
-        room.users.forEach((user) => {
-          this.server.to(user.id).emit('expire', {
+        room.members.forEach((member) => {
+          this.server.to(member).emit('expire', {
             event: 'expire',
             data: room,
           });
@@ -63,17 +63,19 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
   }
 
   broadcastRoomUpdate = (updatedRoom: RoomEntity) => {
-    updatedRoom.users.forEach((user) => this.emitUpdate(user.id, updatedRoom));
+    updatedRoom.members.forEach((member) =>
+      this.emitUpdate(member, updatedRoom),
+    );
   };
 
-  emitUpdate = (userId: string, updatedRoom: RoomEntity) => {
-    this.server.to(userId).emit('updated', {
+  emitUpdate = (member: string, updatedRoom: RoomEntity) => {
+    this.server.to(member).emit('updated', {
       event: 'updated',
       data: updatedRoom,
     });
   };
 
-  findRoom = (hash) => {
+  findRoom = (hash: string) => {
     const matchingRooms = this.roomService.query(
       (record) => record.hash === hash,
     );
@@ -87,13 +89,14 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     if (room) {
       updatedRoom = {
         ...room,
-        users: [...room.users, client.id],
+        members: [...room.members, client.id],
       };
       this.roomService.update(updatedRoom);
     } else {
       updatedRoom = this.roomService.create({
         owner: client.id,
-        users: [{ id: client.id }],
+        members: [client.id],
+        membersInfo: [],
         hash: id,
         createdAt: new Date(),
       });
@@ -101,71 +104,16 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
     this.broadcastRoomUpdate(updatedRoom);
   };
 
-  // vote = (client, { id, option }) => {
-  //   const room = this.findRoom(id);
-  //   if (room) {
-  //     const updatedRoom = {
-  //       ...room,
-  //       status: 'updated',
-  //       selectedOptions: [
-  //         ...room.selectedOptions.filter((option) => option.id !== client.id),
-  //         {
-  //           id: client.id,
-  //           value: option,
-  //         },
-  //       ],
-  //       membersInfo: room.membersInfo.map((member) => {
-  //         if (member.clientId === client.id) {
-  //           return {
-  //             ...member,
-  //             voted: true,
-  //           };
-  //         }
-  //         return member;
-  //       }),
-  //     };
-  //     this.roomService.update(updatedRoom);
-  //     this.broadcastRoomUpdate(updatedRoom);
-  //   }
-  // };
-
-  // reveal = (client, { id }) => {
-  //   const room = this.findRoom(id);
-  //   if (room && room.owner === client.id) {
-  //     const updatedRoom = {
-  //       ...room,
-  //       status: 'updated',
-  //       revealed: !room.revealed,
-  //     };
-  //     this.roomService.update(updatedRoom);
-  //     this.broadcastRoomUpdate(updatedRoom);
-  //   }
-  // };
-
-  // changeOption = (client, { id, option }) => {
-  //   const room = this.findRoom(id);
-  //   if (room && room.owner === client.id) {
-  //     const updatedRoom = {
-  //       ...room,
-  //       status: 'updated',
-  //       options: optionPacks[option] || optionPacks[0],
-  //     };
-  //     this.roomService.update(updatedRoom);
-  //     this.broadcastRoomUpdate(updatedRoom);
-  //   }
-  // };
-
-  updateName = (client, { id, name, roomId }) => {
+  updateName = (client, { id, name }) => {
     const room = this.findRoom(id);
     if (room) {
       const updatedRoom = {
         ...room,
-        users: [
-          ...room.users,
+        membersInfo: [
+          ...room.membersInfo,
           {
-            id: client.id,
-            name: name,
-            room: roomId,
+            clientId: client.id,
+            name,
           },
         ],
       };
@@ -184,25 +132,26 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
 
   handleDisconnect(client: any) {
     const matchingRooms = this.roomService.query((record) =>
-      record.users.includes(client.id),
+      record.members.includes(client.id),
     );
     const room = matchingRooms[0] || null;
     if (room) {
       if (room.owner === client.id) {
-        room.users.forEach((user) => {
-          this.server.to(user.id).emit('expire', {
+        room.members.forEach((member) => {
+          this.server.to(member).emit('expire', {
             event: 'expire',
             data: room,
           });
         });
         this.roomService.delete(room.id);
       } else {
-        console.log(room);
         const updatedRoom = {
           ...room,
-          users: room.users.filter((user) => user.id !== client.id),
+          members: room.members.filter((member) => member !== client.id),
+          membersInfo: room.membersInfo.filter(
+            (member) => member.clientId !== client.id,
+          ),
         };
-        console.log(updatedRoom);
         this.roomService.update(updatedRoom);
         this.broadcastRoomUpdate(updatedRoom);
       }
@@ -219,18 +168,6 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       case 'join':
         this.join(client, data.payload);
         break;
-      // case 'vote':
-      //   this.vote(client, data.payload);
-      //   break;
-      // case 'reset':
-      //   this.resetPool(client, data.payload);
-      //   break;
-      // case 'reveal':
-      //   this.reveal(client, data.payload);
-      //   break;
-      // case 'options':
-      //   this.changeOption(client, data.payload);
-      //   break;
       case 'update_name':
         this.updateName(client, data.payload);
         break;

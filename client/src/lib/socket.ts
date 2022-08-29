@@ -22,7 +22,7 @@ export default function initSocket({
 	const socket = io(wsUrl);
 
 	socket.on('connect', () => {
-		socket.emit('events', { type: 'join', payload: { socketId: socket.id, roomId: roomId } });
+		socket.emit('events', { type: 'join', payload: { id: roomId } });
 		onConnect?.();
 	});
 

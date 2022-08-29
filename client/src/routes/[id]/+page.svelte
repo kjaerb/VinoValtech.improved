@@ -1,39 +1,34 @@
 <script lang="ts">
 	import { page } from '$app/stores';
 	import initSocket from '../../lib/socket';
-	import { wineList } from '../../data/wine';
-	import Wine from '../../components/Wine.svelte';
+	import { fade } from 'svelte/transition';
 	import { onDestroy, onMount } from 'svelte';
 	import type { Socket } from 'socket.io-client';
-	import type User from 'types/User';
+	import type Member from 'types/Member';
 	import type Room from 'types/Room';
 
 	let socket: Socket;
 	let roomId: string = $page.params.id;
+	let connected: boolean = false;
+	let joined: boolean = false;
 	let expired: boolean = false;
 	let owner: boolean = false;
 
-	let user: User = {
-		id: undefined,
-		roomId: roomId,
-		name: undefined,
-		connected: false,
-		joined: false
-	};
+	let member: Member;
 	let room: Room;
 
 	onMount(() => {
 		socket = initSocket({
 			roomId,
 			onConnect: () => {
-				user.connected = true;
+				connected = true;
 			},
 			onUpdated: (event) => {
 				room = event.data;
 				console.log(room);
 			},
 			onJoined: () => {
-				user.joined = true;
+				joined = true;
 			},
 			onExpired: () => {
 				expired = true;
@@ -48,22 +43,29 @@
 	function updateName() {
 		socket.emit('events', {
 			type: 'update_name',
-			payload: { socketId: socket.id, roomId: roomId, name: user.name }
+			payload: { id: roomId, name: member.name }
 		});
 	}
 </script>
 
 <div class=" h-64">
-	{#if !user.connected}
+	{#if !connected}
 		<div class="flex flex-col items-center justify-center">
 			<div
 				style="border-top-color:transparent"
-				class="w-16 h-16 border-4 border-red-400 border-solid rounded-full animate-spin"
+				class="w-16 h-16 border-4 border-indigo-400 border-solid rounded-full animate-spin flex justify-center items-center"
 			/>
+
 			<p class="text-white text-xl mt-4">Connecting to the room</p>
 		</div>
-	{:else if !user.joined}
-		<div class="relative z-10" aria-labelledby="modal-title" role="dialog" aria-modal="true">
+	{:else if !joined}
+		<div
+			transition:fade|local|={{ duration: 200 }}
+			class="relative z-10"
+			aria-labelledby="modal-title"
+			role="dialog"
+			aria-modal="true"
+		>
 			<!--
           Background backdrop, show/hide based on modal state.
       
@@ -123,7 +125,7 @@
 										<p class="text-sm text-gray-500">To join the room, please enter your name:</p>
 										<input
 											class="py-1 px-2 my-2 shadow-md border rounded-lg"
-											bind:value={user.name}
+											bind:value={member.name}
 											placeholder="Enter name"
 										/>
 									</div>
@@ -145,7 +147,7 @@
 	{:else}
 		<div>
 			<h1>
-				Welcome {user.name}
+				Welcome {member.name}
 			</h1>
 		</div>
 	{/if}

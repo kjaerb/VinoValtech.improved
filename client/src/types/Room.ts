@@ -1,10 +1,10 @@
-import type Member from './Member';
+import type { Member, Owner } from './User';
 
 export default interface Room {
 	id: string;
-	owner: string;
 	hash: string;
 	members: string[];
 	membersInfo: Member[];
+	owner: Owner;
 	createdAt: Date;
 }

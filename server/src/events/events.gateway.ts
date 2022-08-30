@@ -94,35 +94,54 @@ export class EventsGateway implements OnGatewayConnection, OnGatewayDisconnect {
       this.roomService.update(updatedRoom);
     } else {
       updatedRoom = this.roomService.create({
-        owner: client.id,
         members: [client.id],
         membersInfo: [],
         hash: id,
+        owner: { clientId: client.id, name: '' },
         createdAt: new Date(),
       });
     }
     this.broadcastRoomUpdate(updatedRoom);
   };
 
-  updateName = (client, { id, name }) => {
+  updateName = (client, { id, name, team }) => {
     const room = this.findRoom(id);
     if (room) {
-      const updatedRoom = {
-        ...room,
-        membersInfo: [
-          ...room.membersInfo,
-          {
+      if (room.owner.clientId === client.id) {
+        const updatedRoom: RoomEntity = {
+          ...room,
+          owner: {
             clientId: client.id,
             name,
           },
-        ],
-      };
-      this.roomService.update(updatedRoom);
-      this.server.to(client.id).emit('joined', {
-        event: 'joined',
-        data: { name },
-      });
-      this.broadcastRoomUpdate(updatedRoom);
+        };
+
+        this.roomService.update(updatedRoom);
+        this.server.to(client.id).emit('joined', {
+          event: 'joined',
+          data: { name },
+        });
+        this.broadcastRoomUpdate(updatedRoom);
+      } else {
+        const updatedRoom: RoomEntity = {
+          ...room,
+          membersInfo: [
+            ...room.membersInfo,
+            {
+              clientId: client.id,
+              name,
+              team,
+            },
+          ],
+        };
+
+        this.roomService.update(updatedRoom);
+        this.server.to(client.id).emit('joined', {
+          event: 'joined',
+          data: { name },
+        });
+        this.broadcastRoomUpdate(updatedRoom);
+      }
     }
   };
 

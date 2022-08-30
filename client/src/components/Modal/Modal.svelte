@@ -1,11 +1,14 @@
 <script lang="ts">
+	import Input from '../../components/Input/Input.svelte';
+
 	import { fade } from 'svelte/transition';
+	import type { InputType } from '../../types/Input';
 
 	export let title: string = '';
 	export let description: string = '';
 	export let inputPlaceholder: string = '';
 	export let input: string;
-	export let inputType: string | null | undefined = '';
+	let inputType: InputType;
 </script>
 
 <div
@@ -70,20 +73,7 @@
 
 							<div class="mt-2">
 								<p class="text-sm text-gray-500">{description}</p>
-								{#if inputType === 'number'}
-									<input
-										bind:value={input}
-										type="number"
-										class="py-1 px-2 my-2 shadow-md border rounded-lg"
-										placeholder={inputPlaceholder}
-									/>
-								{:else}
-									<input
-										bind:value={input}
-										class="py-1 px-2 my-2 shadow-md border rounded-lg"
-										placeholder={inputPlaceholder}
-									/>
-								{/if}
+								<Input type={inputType} {input} {inputPlaceholder} />
 							</div>
 						</div>
 					</div>
